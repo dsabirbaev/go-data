@@ -119,7 +119,7 @@ export default function YesNoDodgeMobile() {
           lineHeight: 1.4,
         }}
       >
-        Go data?
+        Can we talk?
       </p>
 
       <div
@@ -181,7 +181,7 @@ export default function YesNoDodgeMobile() {
 
       {answer && (
         <p style={{ marginTop: 14, fontSize: 14, color: "#666" }}>
-          Выбрано: {answer}
+          You said: {answer}
         </p>
       )}
     </div>
