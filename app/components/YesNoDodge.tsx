@@ -6,42 +6,67 @@ import confetti from "canvas-confetti";
 
 export default function YesNoDodgeMobile() {
   const stageRef = useRef<HTMLDivElement>(null);
+  const yesBtnRef = useRef<HTMLButtonElement>(null);
   const noBtnRef = useRef<HTMLButtonElement>(null);
   const [noPos, setNoPos] = useState<{ x: number; y: number } | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
 
-  const isDodging = useRef(false); // защита от повторных вызовов на каждый touchmove
+  const isDodging = useRef(false);
 
   const dodge = useCallback((pointerX: number, pointerY: number) => {
     const stage = stageRef.current;
     const btn = noBtnRef.current;
-    if (!stage || !btn) return;
+    const yesBtn = yesBtnRef.current;
+    if (!stage || !btn || !yesBtn) return;
 
     const sw = stage.clientWidth;
     const sh = stage.clientHeight;
     const bw = btn.offsetWidth;
     const bh = btn.offsetHeight;
     const pad = 10;
-    const minDist = 120;
+    const minDistFromPointer = 120;
+
+    // зона Yes-кнопки для исключения коллизий
+    const yesRect = yesBtn.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    const yesLeft = yesRect.left - stageRect.left;
+    const yesTop = yesRect.top - stageRect.top;
+    const yesRight = yesLeft + yesRect.width;
+    const yesBottom = yesTop + yesRect.height;
+    const safetyMargin = 16; // дополнительный буфер вокруг Yes
 
     let x = 0;
     let y = 0;
     let tries = 0;
+    let valid = false;
 
-    do {
+    while (!valid && tries < 30) {
       x = pad + Math.random() * (sw - bw - pad * 2);
       y = pad + Math.random() * (sh - bh - pad * 2);
       tries++;
-    } while (
-      Math.hypot(x + bw / 2 - pointerX, y + bh / 2 - pointerY) < minDist &&
-      tries < 10
-    );
+
+      const noRight = x + bw;
+      const noBottom = y + bh;
+
+      // проверка пересечения прямоугольников No и Yes (с буфером)
+      const overlapsYes =
+        x < yesRight + safetyMargin &&
+        noRight > yesLeft - safetyMargin &&
+        y < yesBottom + safetyMargin &&
+        noBottom > yesTop - safetyMargin;
+
+      const tooCloseToPointer =
+        Math.hypot(x + bw / 2 - pointerX, y + bh / 2 - pointerY) <
+        minDistFromPointer;
+
+      if (!overlapsYes && !tooCloseToPointer) {
+        valid = true;
+      }
+    }
 
     setNoPos({ x, y });
   }, []);
 
-  // главное изменение: слушаем движение пальца по ВСЕЙ области,
-  // а не касание конкретно кнопки
   const handleAreaTouchMove = (e: React.TouchEvent) => {
     const stage = stageRef.current;
     const btn = noBtnRef.current;
@@ -57,14 +82,14 @@ export default function YesNoDodgeMobile() {
     const by = btnRect.top - rect.top + btnRect.height / 2;
 
     const distance = Math.hypot(px - bx, py - by);
-    const triggerRadius = 70; // палец активирует убегание, не долетая до кнопки
+    const triggerRadius = 70;
 
     if (distance < triggerRadius && !isDodging.current) {
       isDodging.current = true;
       dodge(px, py);
       setTimeout(() => {
         isDodging.current = false;
-      }, 150); // короткий кулдаун, чтобы не дёргалась на каждый touchmove-тик
+      }, 150);
     }
   };
 
@@ -132,10 +157,11 @@ export default function YesNoDodgeMobile() {
           border: "1px solid #e5e5e5",
           borderRadius: 12,
           overflow: "hidden",
-          touchAction: "none", // блокирует скролл страницы во время слежения за пальцем
+          touchAction: "none",
         }}
       >
         <button
+          ref={yesBtnRef}
           onClick={handleYes}
           style={{
             position: "absolute",
@@ -158,7 +184,6 @@ export default function YesNoDodgeMobile() {
 
         <button
           ref={noBtnRef}
-          // клик всё равно заблокирован на случай если палец каким-то образом попадёт
           onClick={(e) => e.preventDefault()}
           style={{
             position: "absolute",
@@ -172,7 +197,7 @@ export default function YesNoDodgeMobile() {
             fontSize: 16,
             fontWeight: 500,
             minWidth: 88,
-            pointerEvents: "none", // палец физически не может "нажать" на неё
+            pointerEvents: "none",
           }}
         >
           No
@@ -180,7 +205,7 @@ export default function YesNoDodgeMobile() {
       </div>
 
       {answer && (
-        <p style={{ marginTop: 14, fontSize: 14, color: "#666" }}>
+        <p style={{ marginTop: 14, fontSize: 24, color: "#666" }}>
           You said: {answer}
         </p>
       )}
